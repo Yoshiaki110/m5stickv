@@ -12,42 +12,93 @@ WebServer server(80);
 uint8_t *buff;
 static const int RX_BUF_SIZE = 100000;
 
-void sendPic() {
-  WiFiClient client = server.client();
-  Serial.println("sendPic start");
+
+bool transfer(WiFiClient client) {
+  Serial.println("transfer start");
 
   Serial2.write("get");
-  delay(100);
+  delay(50);
 
   uint8_t buf[3];
   int len = Serial2.readBytes(buf, 3);
   if (len != 3) {
-    Serial.println("sendPic get length error");
-    return;
+    Serial.println("transfer get length error");
+    return false;
   }
   int pLen = (uint32_t)(buf[0] << 16) | (buf[1] << 8) | buf[2];
-  Serial.print("sendPic picture length : ");
+  Serial.print("transfer picture length : ");
   Serial.println(pLen);
-
-  len = Serial2.readBytes(buff, pLen);
-  if (len != pLen) {
-    Serial.print("sendPic get picture error ");
-    Serial.print(len);
-    Serial.print("-");
-    Serial.println(pLen);
-    return;
+  int tLen = pLen;
+  while (1) {
+    len = Serial2.readBytes(buff, tLen);
+    if (len != tLen) {
+      Serial.print("transfer get picture retry ");
+      Serial.print(len);
+      Serial.print("-");
+      Serial.println(tLen);
+      tLen -= len;
+    } else if (len == 0) {
+      Serial.print("transfer get picture error ");
+      Serial.print(len);
+      Serial.print("-");
+      Serial.println(tLen);
+      return false;
+    } else {
+      break;
+    }
+    if (!client.connected()) {
+      break;
+    }
+    delay(10);
   }
 
   len = Serial2.readBytes(buf, 3);
   if (len != 3) {
-    Serial.println("sendPic get footer error");
-    return;
+    Serial.println("transfer get footer error");
+    return false;
   }
   client.write(buff, pLen); 
+  //
+  Serial.println("transfer end");
+  return true;
+}
+
+void sendPic() {
+  WiFiClient client = server.client();
+  Serial.println("sendPic start");
+
+  transfer(client);
+
   Serial.println("sendPic end");
 }
- 
- 
+
+void streamPic() {
+  Serial.println("streamPic start");
+  WiFiClient client = server.client();
+  String response = "HTTP/1.1 200 OK\r\n";
+  response += "Content-Type: multipart/x-mixed-replace; boundary=frame\r\n\r\n";
+  server.sendContent(response);
+
+  while (1) {
+    if (!client.connected()) {
+      break;
+    }
+    response = "--frame\r\n";
+    response += "Content-Type: image/jpeg\r\n\r\n";
+    server.sendContent(response);
+
+    if (!transfer(client)) {
+      break;
+    }
+    
+    server.sendContent("\r\n");
+    if (!client.connected()) {
+      break;
+    }
+  }
+  Serial.println("streamPic end");
+}
+
 void setup() {
   pinMode(10, OUTPUT);
   
@@ -90,7 +141,7 @@ void setup() {
   });
  
   server.on("/pic", HTTP_GET, sendPic);
-//  server.on("/stream", HTTP_GET, streamPic);
+  server.on("/stream", HTTP_GET, streamPic);
  
   server.begin();
   Serial.println("HTTP server started");
