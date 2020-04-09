@@ -14,10 +14,14 @@ sensor.skip_frames(time = 2000)
 
 clock = time.clock()
 
+i = 0
 while(True):
     clock.tick()
     img = sensor.snapshot()
     print(clock.fps())
-    data_packet = bytearray([0x41,0x42,0x43,0x44,0x45])
+    #data_packet = bytearray([0x41,0x42,0x43,0x44,0x45])
+    data_packet = bytearray([0xFF,0xAA])
+    data_packet.append(i % 256)
     uart_Port.write(data_packet)
+    i += 1
     time.sleep(1)
