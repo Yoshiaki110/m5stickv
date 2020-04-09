@@ -95,17 +95,21 @@ bool transfer(WiFiClient client) {
 
 void sendPic() {
   disp("", "", "", "/pic");
+  digitalWrite(GPIO_NUM_10, LOW);
   WiFiClient client = server.client();
   Serial.println("sendPic start");
 
   transfer(client);
 
   Serial.println("sendPic end");
+  digitalWrite(GPIO_NUM_10, HIGH);
   disp("", "", "", "/pic end");
 }
 
 void streamPic() {
+  long t = 0L;
   disp("", "", "", "/stream");
+  digitalWrite(GPIO_NUM_10, LOW);
   Serial.println("streamPic start");
   WiFiClient client = server.client();
   String response = "HTTP/1.1 200 OK\r\n";
@@ -113,23 +117,32 @@ void streamPic() {
   server.sendContent(response);
 
   while (1) {
+    t = millis();
     if (!client.connected()) {
       break;
     }
+    Serial.printf("delay 1:%ld\n", millis() - t);
     response = "--frame\r\n";
     response += "Content-Type: image/jpeg\r\n\r\n";
+    t = millis();
     server.sendContent(response);
+    Serial.printf("delay 2:%ld\n", millis() - t);
 
     if (!transfer(client)) {
       break;
     }
-    
+
+    t = millis();
     server.sendContent("\r\n");
+    Serial.printf("delay 3:%ld\n", millis() - t);
+    t = millis();
     if (!client.connected()) {
       break;
     }
+    Serial.printf("delay 4:%ld\n", millis() - t);
   }
   Serial.println("streamPic end");
+  digitalWrite(GPIO_NUM_10, HIGH);
   disp("", "", "", "/stream end");
 }
 
@@ -141,7 +154,10 @@ void setup() {
     
   Serial.begin(115200);
   Serial2.begin(115200, SERIAL_8N1, 32, 33);
- 
+
+  pinMode(GPIO_NUM_10, OUTPUT);
+  digitalWrite(GPIO_NUM_10, HIGH);
+  
   buff = (uint8_t *) malloc(sizeof(uint8_t) * RX_BUF_SIZE);
  
   disp(" AP : " +  String(ssid), "", "", "STATUS : Connecting...");

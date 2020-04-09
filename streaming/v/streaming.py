@@ -5,6 +5,7 @@ from Maix import GPIO
 import sensor, lcd
 
 lcd.init()
+lcd.rotation(2)
 sensor.reset()
 sensor.set_pixformat(sensor.RGB565)
 sensor.set_framesize(sensor.QVGA)
